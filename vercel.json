@@ -2,21 +2,21 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/**/*.ts",
+      "src": "server.mjs",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "src": "/(.*)",
+      "dest": "/server.mjs"
     }
   ],
   "env": {
     "XRPL_NETWORK": "wss://s.devnet.rippletest.net:51233"
   },
   "functions": {
-    "api/**/*.ts": {
+    "server.mjs": {
       "maxDuration": 30
     }
   }
