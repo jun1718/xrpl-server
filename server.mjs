@@ -352,6 +352,112 @@ app.post('/api/credential/delete', async (req, res) => {
   }
 });
 
+// 통합 Credential API
+app.post('/api/credential/create-and-accept', async (req, res) => {
+  try {
+    console.log('🔍 Create and Accept Credential request received:', req.body);
+    
+    const { issuerSeed, subjectSeed, credentialType, expiration, uri } = req.body;
+    
+    // 입력 검증
+    if (!issuerSeed || !subjectSeed || !credentialType) {
+      console.log('❌ Missing required fields:', { 
+        issuerSeed: !!issuerSeed, 
+        subjectSeed: !!subjectSeed, 
+        credentialType: !!credentialType 
+      });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required fields: issuerSeed, subjectSeed, credentialType',
+        message: 'Missing required fields: issuerSeed, subjectSeed, credentialType',
+        status: 400,
+        timestamp: new Date().toISOString(),
+        path: '/api/credential/create-and-accept'
+      });
+    }
+
+    // XRPL 시드 형식 검증
+    if (!issuerSeed.startsWith('s') || issuerSeed.length < 25) {
+      console.log('❌ Invalid issuerSeed format');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid issuerSeed format. XRPL seed must start with "s" and be at least 25 characters long.',
+        message: 'Invalid issuerSeed format. XRPL seed must start with "s" and be at least 25 characters long.',
+        status: 400,
+        timestamp: new Date().toISOString(),
+        path: '/api/credential/create-and-accept'
+      });
+    }
+
+    if (!subjectSeed.startsWith('s') || subjectSeed.length < 25) {
+      console.log('❌ Invalid subjectSeed format');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid subjectSeed format. XRPL seed must start with "s" and be at least 25 characters long.',
+        message: 'Invalid subjectSeed format. XRPL seed must start with "s" and be at least 25 characters long.',
+        status: 400,
+        timestamp: new Date().toISOString(),
+        path: '/api/credential/create-and-accept'
+      });
+    }
+
+    console.log('📦 Importing credential module...');
+    const { createAndAcceptCredential } = await import('./lib/credential.mjs');
+    console.log('✅ Credential module imported successfully');
+    
+    console.log('🔐 Calling createAndAcceptCredential with params:', {
+      issuerSeed: issuerSeed.substring(0, 10) + '...',
+      subjectSeed: subjectSeed.substring(0, 10) + '...',
+      credentialType,
+      expiration,
+      uri
+    });
+    
+    const result = await createAndAcceptCredential(issuerSeed, subjectSeed, credentialType, expiration, uri);
+    console.log('✅ Create and Accept Credential result:', result);
+    
+    res.json({ 
+      success: true, 
+      data: result, 
+      message: 'Credential created and accepted successfully' 
+    });
+  } catch (error) {
+    console.error('❌ Create and Accept Credential error:', error);
+    console.error('❌ Error stack:', error.stack);
+    
+    // 더 구체적인 에러 메시지 제공
+    let errorMessage = error.message;
+    if (error.message.includes('Unknown letter')) {
+      errorMessage = 'Invalid wallet seed format. Please provide valid XRPL seeds that start with "s".';
+    } else if (error.message.includes('checksum_invalid')) {
+      errorMessage = 'Invalid wallet seed checksum. The seeds appear to be corrupted or invalid.';
+    } else if (error.message.includes('Invalid seed')) {
+      errorMessage = 'Invalid wallet seed format. Please provide valid XRPL seeds.';
+    } else if (error.message.includes('temREDUNDANT')) {
+      errorMessage = 'Transaction is redundant. The issuer and subject addresses cannot be the same.';
+    } else if (error.message.includes('temINVALID')) {
+      errorMessage = 'Invalid transaction parameters. Please check your input values.';
+    }
+    
+    // Spring WebClient 호환성을 위한 에러 응답
+    const errorResponse = {
+      success: false,
+      error: errorMessage,
+      message: errorMessage,
+      status: 500,
+      timestamp: new Date().toISOString(),
+      path: '/api/credential/create-and-accept',
+      details: {
+        originalError: error.message,
+        endpoint: '/api/credential/create-and-accept'
+      }
+    };
+    
+    console.log('📤 Sending error response:', JSON.stringify(errorResponse, null, 2));
+    res.status(500).json(errorResponse);
+  }
+});
+
 // Domain APIs
 app.post('/api/domain/create', async (req, res) => {
   try {
